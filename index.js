@@ -18,6 +18,20 @@ bot.api.setMyCommands([
 		description: 'Билеты розыгрыша'
 	}
 ]);
+// Функция создания кнопки выбора пользователя
+const createChooseUserBtn = (ctx) => {
+	return (
+		[[{
+			text: 'К списку контактов',
+			request_users: {
+				request_id: ctx.message.from.id,
+				request_username: true,
+				user_is_bot: false
+			}
+		}]])
+} 
+
+
 
 // Создаем клавиатуру для меню
 const menuLabels = ['Проверить подписку на канал', 'Проверить билеты'];
@@ -45,18 +59,9 @@ bot.command('start', async (ctx) => {
 })
 
 bot.command('Пригласить друга', async (ctx) => {
-	let shareUserBtn = [
-		[{
-			text: 'К списку контактов',
-			request_users: {
-				request_id: 123123123,
-				// request_username: true,
-			}
-		}]
-	]
 	await ctx.reply('Выбрать из списка контактов', {
 		reply_markup: {
-			keyboard: shareUserBtn,
+			keyboard: createChooseUserBtn(ctx),
 			resize_keyboard: true,
 			one_time_keyboard: true
 		}
@@ -87,7 +92,7 @@ bot.hears('Проверить подписку на канал', async (ctx) => 
 	let id = ctx.msg.from.id;
 	let username = ctx.msg.from.username;
 	let pass = await bot.api.getChatMember('@shuratest', id);
-	await bot.api.chatMemberUp
+
 	if (pass.status == 'left') {
 		await ctx.reply('Вы не подписаны на канал',
 			{
@@ -106,18 +111,9 @@ bot.hears('Проверить подписку на канал', async (ctx) => 
 })
 
 bot.hears('Пригласить друга', async (ctx) => {
-	let shareUserBtn = [
-		[{
-			text: 'К списку контактов',
-			request_users: {
-				request_id: ctx.message.from.id,
-				request_username: true,
-			}
-		}]
-	]
 	await ctx.reply('Выберите друга из списка контактов', {
 		reply_markup: {
-			keyboard: shareUserBtn,
+			keyboard: createChooseUserBtn(ctx),
 			resize_keyboard: true,
 			one_time_keyboard: true
 		}
@@ -125,42 +121,50 @@ bot.hears('Пригласить друга', async (ctx) => {
 })
 
 bot.on(':users_shared', async (ctx) => {
-	let newUsers = []
-	ctx.message.users_shared.users.map(async (user) => 
-		{
-			console.log(
-				'user: ', user,
-				'user_id: ', user.user_id,
-				// 'username: ', user.username
-			)
-			let id = user.user_id;
-			let pass = await bot.api.getChatMember('@shuratest', id);
-			if (pass.user.is_bot === true) {
-				console.log('бот');
-			} else  {
-				console.log('пользователь');
-				newUsers.push(user)
+	console.log(ctx.message.users_shared);
+	let user = ctx.message.users_shared.users[0];
+	let id = user.user_id;
+	try {
+		const pass = await bot.api.getChatMember('@shuratest', id);
+	user.status = pass.status
+
+	if (user.status == 'left') {
+		await ctx.reply('Данные пользователя получены 👍')
+		await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
+		await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
+			reply_markup: {
+				keyboard: createChooseUserBtn(ctx),
+				resize_keyboard: true,
+				one_time_keyboard: true
 			}
-			console.log(newUsers);
-		}
-	)
-	// newUsers = ctx.message.users.users_shared.users.map((user) => )
-	// else {
-	// 	console.log('Данные подписчика: ',
-	// 		'sub_id: ', ctx.message.users_shared.request_id,
-	// 		'sub_username: ', ctx.message.from.username,
-	// 	);
-	// 	ctx.message.users_shared.users.map((user) => console.log(
-	// 		'user_id: ', user.user_id,
-	// 		'username: ', user.username
-	// 	))
-		
-	// 	await ctx.reply('Данные пользователя получены 👍')
-	// 	await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
-	// 	await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`)
-	// }
-	
-})
+		})
+	} else if (user.status == 'kicked') {
+		await ctx.reply(`Пользователь ${user.username} заблокирован за нарушение правил канала, попробуйте выбрать другого человка`, {
+			reply_markup: {
+				keyboard: createChooseUserBtn(ctx),
+				resize_keyboard: true,
+				one_time_keyboard: true
+			}
+		})
+	} else await ctx.reply(`Пользователь ${user.username} уже подписан на канал, попробуйте выбрать другого человка`, {
+				reply_markup: {
+					keyboard: createChooseUserBtn(ctx),
+					resize_keyboard: true,
+					one_time_keyboard: true
+			}
+			})
+	} catch (error) {
+		await ctx.reply('Данные пользователя получены 👍')
+		await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
+		await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
+			reply_markup: {
+				keyboard: createChooseUserBtn(ctx),
+				resize_keyboard: true,
+				one_time_keyboard: true
+			}
+		})
+	}
+	})
 	
 bot.hears('<- Назад в меню', async (ctx) => {
 	await ctx.reply('Выберите действие',

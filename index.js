@@ -33,7 +33,7 @@ const onFailSubRows = onFailSub.map((label) => {
 	]
 })
 const menuKeyboard = Keyboard.from(menuRows).resized().oneTime()
-const shareUserKeyboard = new Keyboard().text('Пригласить друга').resized().oneTime()
+const shareUserKeyboard = new Keyboard().text('Пригласить друга').resized()
 const onFailSubKeyboard = Keyboard.from(onFailSubRows).resized().oneTime()
 
 bot.command('start', async (ctx) => {
@@ -50,7 +50,7 @@ bot.command('Пригласить друга', async (ctx) => {
 			text: 'К списку контактов',
 			request_users: {
 				request_id: 123123123,
-				request_username: true,
+				// request_username: true,
 			}
 		}]
 	]
@@ -72,13 +72,13 @@ bot.command('menu', (ctx) => {
 })
 
 bot.command('tickets', async (ctx) => {
-	ctx.reply('За каждого подписавшегося на канал друга вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
+	ctx.reply('За каждого подписавшегося на канал друга, вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
 		reply_markup: menuKeyboard
 	})
 })
 
 bot.hears('Проверить билеты', async (ctx) => {
-	ctx.reply('За каждого подписавшегося на канал друга вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
+	ctx.reply('За каждого подписавшегося на канал друга, вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
 		reply_markup: menuKeyboard
 	})
 })
@@ -125,17 +125,41 @@ bot.hears('Пригласить друга', async (ctx) => {
 })
 
 bot.on(':users_shared', async (ctx) => {
-	console.log('Данные подписчика: ',
-		'sub_id: ', ctx.message.users_shared.request_id,
-		'sub_username: ', ctx.message.from.username,
-	);
-	ctx.message.users_shared.users.map((user) => console.log(
-		'user_id: ', user.user_id,
-		'username: ', user.username
-	))
-	await ctx.reply('Данные пользователя получены 👍')
-	await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
-	await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`)
+	let newUsers = []
+	ctx.message.users_shared.users.map(async (user) => 
+		{
+			console.log(
+				'user: ', user,
+				'user_id: ', user.user_id,
+				// 'username: ', user.username
+			)
+			let id = user.user_id;
+			let pass = await bot.api.getChatMember('@shuratest', id);
+			if (pass.user.is_bot === true) {
+				console.log('бот');
+			} else  {
+				console.log('пользователь');
+				newUsers.push(user)
+			}
+			console.log(newUsers);
+		}
+	)
+	// newUsers = ctx.message.users.users_shared.users.map((user) => )
+	// else {
+	// 	console.log('Данные подписчика: ',
+	// 		'sub_id: ', ctx.message.users_shared.request_id,
+	// 		'sub_username: ', ctx.message.from.username,
+	// 	);
+	// 	ctx.message.users_shared.users.map((user) => console.log(
+	// 		'user_id: ', user.user_id,
+	// 		'username: ', user.username
+	// 	))
+		
+	// 	await ctx.reply('Данные пользователя получены 👍')
+	// 	await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
+	// 	await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`)
+	// }
+	
 })
 	
 bot.hears('<- Назад в меню', async (ctx) => {

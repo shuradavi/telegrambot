@@ -1,9 +1,31 @@
-require('dotenv').config();
-const { Bot, GrammyError, HttpError, Keyboard, InlineKeyboard } = require('grammy');
-const {KeyboardButtonRequestUser} = require('grammy/types')
-// const {hydrate} = require('@grammyjs/hydrate')
+import 'dotenv/config'
+// import { JSONFilePreset } from 'lowdb/node'
+// import { Low } from 'lowdb'
+// import { JSONFile } from 'lowdb/node'
+import { Bot, GrammyError,HttpError, Keyboard } from "grammy";
+// const { KeyboardButtonRequestUser } = require('grammy/types')
+// import {createChooseUserBtn} from './utils';
 const bot = new Bot(process.env.BOT_TOKEN);
-// bot.use(hydrate());
+const createChooseUserBtn = (ctx) => {
+	return (
+		[[{
+			text: 'К списку контактов',
+			request_users: {
+				request_id: ctx.message.from.id,
+				request_username: true,
+				user_is_bot: false
+			}
+		}]])
+}
+// const db = new Low(new JSONFile('file.json'), {})
+// await db.read()
+
+
+import { LowSync } from 'lowdb'
+import { JSONFileSync } from 'lowdb/node'
+
+const db = new LowSync(new JSONFileSync('db.json'), {users: []})
+
 bot.api.setMyCommands([
 	{
 		command: 'start',
@@ -18,20 +40,6 @@ bot.api.setMyCommands([
 		description: 'Билеты розыгрыша'
 	}
 ]);
-// Функция создания кнопки выбора пользователя
-const createChooseUserBtn = (ctx) => {
-	return (
-		[[{
-			text: 'К списку контактов',
-			request_users: {
-				request_id: ctx.message.from.id,
-				request_username: true,
-				user_is_bot: false
-			}
-		}]])
-} 
-
-
 
 // Создаем клавиатуру для меню
 const menuLabels = ['Проверить подписку на канал', 'Проверить билеты'];
@@ -51,11 +59,13 @@ const shareUserKeyboard = new Keyboard().text('Пригласить друга')
 const onFailSubKeyboard = Keyboard.from(onFailSubRows).resized().oneTime()
 
 bot.command('start', async (ctx) => {
-	const username = ctx.msg.from.username
-	await ctx.reply(`Привет, ${username}! Я - бот тг-канала: <a href="https://t.me/shuratest">Shura Test</a>`, {
-		parse_mode: 'HTML',
-		reply_markup: menuKeyboard,
-	})
+	if (ctx.from.is_bot === false) {
+		const username = ctx.msg.from.username
+		await ctx.reply(`Привет, ${username}! Я - бот тг-канала: <a href="https://t.me/shuratest">Shura Test</a>`, {
+			parse_mode: 'HTML',
+			reply_markup: menuKeyboard,
+		})
+	}
 })
 
 bot.command('Пригласить друга', async (ctx) => {
@@ -121,14 +131,17 @@ bot.hears('Пригласить друга', async (ctx) => {
 })
 
 bot.on(':users_shared', async (ctx) => {
-	console.log(ctx.message.users_shared);
+	// console.log(ctx.message.users_shared);
 	let user = ctx.message.users_shared.users[0];
 	let id = user.user_id;
+	console.log('sub: ', ctx.message.from.id, 'newUser: ', id );
+
 	try {
 		const pass = await bot.api.getChatMember('@shuratest', id);
-	user.status = pass.status
+		user.status = pass.status
 
-	if (user.status == 'left') {
+		if (user.status == 'left') {
+			console.log('Сработал 1');
 		await ctx.reply('Данные пользователя получены 👍')
 		await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
 		await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
@@ -138,6 +151,13 @@ bot.on(':users_shared', async (ctx) => {
 				one_time_keyboard: true
 			}
 		})
+		db.read()
+		const data = {
+			"sub": ctx.message.from.id,
+			"newUser": id
+		}
+		db.update(({ users }) => users.push(data))
+		return db;
 	} else if (user.status == 'kicked') {
 		await ctx.reply(`Пользователь ${user.username} заблокирован за нарушение правил канала, попробуйте выбрать другого человка`, {
 			reply_markup: {
@@ -154,6 +174,7 @@ bot.on(':users_shared', async (ctx) => {
 			}
 			})
 	} catch (error) {
+		console.log('Сработал Catch');
 		await ctx.reply('Данные пользователя получены 👍')
 		await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
 		await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
@@ -163,6 +184,18 @@ bot.on(':users_shared', async (ctx) => {
 				one_time_keyboard: true
 			}
 		})
+		db.read()
+		// console.log(db.data);
+		console.log(!db.data.users.find((user) => user["newUser"] == id));
+		if ((!db.data.users.length) || (!db.data.users.find((user) => user.newUser == id))) {
+			console.log('Запись');
+			const data = {
+				"sub": ctx.message.from.id,
+				"newUser": id
+			}
+			db.update(({ users }) => users.push(data))
+			return db;
+		}
 	}
 	})
 	

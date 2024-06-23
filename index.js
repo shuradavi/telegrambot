@@ -1,31 +1,37 @@
 import 'dotenv/config'
-// import { JSONFilePreset } from 'lowdb/node'
-// import { Low } from 'lowdb'
-// import { JSONFile } from 'lowdb/node'
+import { LowSync, Low } from 'lowdb'
+import { JSONFileSync, JSONFilePreset } from 'lowdb/node'
 import { Bot, GrammyError,HttpError, Keyboard } from "grammy";
-// const { KeyboardButtonRequestUser } = require('grammy/types')
-// import {createChooseUserBtn} from './utils';
 const bot = new Bot(process.env.BOT_TOKEN);
+const db = new LowSync(new JSONFileSync('users.json'), { "users": {} })
+// const cl = new LowSync(new JSONFileSync('contestList.json'), { "list": {} })
+const cl = await JSONFilePreset(('contestList.json'), { "users": {}})
 const createChooseUserBtn = (ctx) => {
 	return (
-		[[{
-			text: 'К списку контактов',
-			request_users: {
-				request_id: ctx.message.from.id,
-				request_username: true,
-				user_is_bot: false
-			}
-		}]])
+		[
+			[
+				{
+					text: 'К списку контактов',
+					request_users: {
+						request_id: ctx.message.from.id,
+						request_username: true,
+						user_is_bot: false
+					}
+				}
+			],
+			[
+				{
+					text: 'Проверить билеты'
+				}
+			],
+			[
+				{
+					text: '<- Назад в меню'
+				}
+			]
+			
+		])
 }
-// const db = new Low(new JSONFile('file.json'), {})
-// await db.read()
-
-
-import { LowSync } from 'lowdb'
-import { JSONFileSync } from 'lowdb/node'
-
-const db = new LowSync(new JSONFileSync('db.json'), {users: []})
-
 bot.api.setMyCommands([
 	{
 		command: 'start',
@@ -55,7 +61,7 @@ const onFailSubRows = onFailSub.map((label) => {
 	]
 })
 const menuKeyboard = Keyboard.from(menuRows).resized().oneTime()
-const shareUserKeyboard = new Keyboard().text('Пригласить друга').resized()
+const shareUserKeyboard = new Keyboard().text('Пригласить друга').row().text('Проверить билеты').row().text('<- Назад в меню').resized()
 const onFailSubKeyboard = Keyboard.from(onFailSubRows).resized().oneTime()
 
 bot.command('start', async (ctx) => {
@@ -68,32 +74,79 @@ bot.command('start', async (ctx) => {
 	}
 })
 
-bot.command('Пригласить друга', async (ctx) => {
-	await ctx.reply('Выбрать из списка контактов', {
-		reply_markup: {
-			keyboard: createChooseUserBtn(ctx),
-			resize_keyboard: true,
-			one_time_keyboard: true
-		}
-	})
-})
-
-
 bot.command('menu', (ctx) => {
-		ctx.reply(`Выберите действие`, {
-		parse_mode: 'HTML',
-		reply_markup: menuKeyboard
-	})
+	ctx.reply(`Выберите действие`, {
+	parse_mode: 'HTML',
+	reply_markup: menuKeyboard
+})
 })
 
 bot.command('tickets', async (ctx) => {
-	ctx.reply('За каждого подписавшегося на канал друга, вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
+	const userId = ctx.message.from.id;
+	db.read()
+	const invitedUsers = db.data.users[userId];
+	let tickets;
+	tickets = await invitedUsers.reduce( async  (acc, cur) => {
+		try {
+			let pass = await bot.api.getChatMember('@shuratest', cur);
+			if (pass.status == 'member') {
+				console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
+				acc = await acc + 1;
+			} else {
+				console.log(`Пользователь с id: ${cur} не подписан на канал`);
+			}
+		} catch (error) {
+			console.log(`Пользователь с id: ${cur} не подписан на канал`);
+		}
+		return acc;
+	}, 0)
+	await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
 		reply_markup: menuKeyboard
 	})
 })
 
+bot.command('getContestList', async (ctx) => {
+	if (ctx.message.from.id == 951161100) {
+		db.read()
+		const usersList = Object.keys(db.data.users)
+		let contestList = {}
+		for (let i = 0; i < usersList.length; i++) {
+			const invitedUsers = db.data.users[usersList[i]]
+			const invitedUsersCount = invitedUsers.length
+			contestList = {
+				...contestList,
+				[usersList[i]]: invitedUsersCount
+			}
+		}
+		await cl.read()
+		await cl.update(({}) => {
+			console.log('Запись...');
+			cl.data = {...contestList}
+		})
+		return cl;
+	}
+})
+
 bot.hears('Проверить билеты', async (ctx) => {
-	ctx.reply('За каждого подписавшегося на канал друга, вы получаете билеты участия в розыгрыше. На данный момент у вас N билетов', {
+	const userId = ctx.message.from.id;
+	db.read()
+	const invitedUsers = db.data.users[userId];
+	let tickets = 0;
+	tickets = await invitedUsers.reduce( async  (acc, cur) => {
+		try {
+			let pass = await bot.api.getChatMember('@shuratest', cur);
+			if (pass.status == 'member') {
+				console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
+				acc = await acc + 1;
+			} else {
+				console.log(`Пользователь с id: ${cur} не подписан на канал`);
+			}
+		} catch (error) {
+			console.log(`Пользователь с id: ${cur} не подписан на канал`);
+		}
+		return acc;
+	}, 0)
+	await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
 		reply_markup: menuKeyboard
 	})
 })
@@ -131,47 +184,54 @@ bot.hears('Пригласить друга', async (ctx) => {
 })
 
 bot.on(':users_shared', async (ctx) => {
-	// console.log(ctx.message.users_shared);
-	let user = ctx.message.users_shared.users[0];
-	let id = user.user_id;
-	console.log('sub: ', ctx.message.from.id, 'newUser: ', id );
+	let sub = ctx.message.from.id
+	let newUser = ctx.message.users_shared.users[0];
+	let id = newUser.user_id;
+	console.log('sub: ', sub, 'newUser: ', id );
 
 	try {
 		const pass = await bot.api.getChatMember('@shuratest', id);
-		user.status = pass.status
+		newUser.status = pass.status
 
-		if (user.status == 'left') {
+		if (newUser.status == 'left') {
 			console.log('Сработал 1');
-		await ctx.reply('Данные пользователя получены 👍')
-		await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
-		await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
-			reply_markup: {
-				keyboard: createChooseUserBtn(ctx),
-				resize_keyboard: true,
-				one_time_keyboard: true
-			}
-		})
-		db.read()
-		const data = {
-			"sub": ctx.message.from.id,
-			"newUser": id
-		}
-		db.update(({ users }) => users.push(data))
-		return db;
-	} else if (user.status == 'kicked') {
-		await ctx.reply(`Пользователь ${user.username} заблокирован за нарушение правил канала, попробуйте выбрать другого человка`, {
-			reply_markup: {
-				keyboard: createChooseUserBtn(ctx),
-				resize_keyboard: true,
-				one_time_keyboard: true
-			}
-		})
-	} else await ctx.reply(`Пользователь ${user.username} уже подписан на канал, попробуйте выбрать другого человка`, {
+			await ctx.reply('Данные пользователя получены 👍')
+			await ctx.reply('Для участия в розыгрыше отправьте ссылку другу: https://t.me/+hA7XB2pUFmJlZDgy')
+			await ctx.reply(`Как только он подпишется на канал, вам добавится билет розыгрыша. Помните, чем больше друзей подпишется на канал, тем выше шанс на победу`, {
 				reply_markup: {
 					keyboard: createChooseUserBtn(ctx),
 					resize_keyboard: true,
 					one_time_keyboard: true
-			}
+				}
+			})
+			db.read()
+			db.update(({ users }) => {
+				if (!Object.hasOwn(users, sub)) {
+					console.log('Создаем пустой массив для подписчика и добавляем пользоваателя в массив');
+					users[sub] = [];
+					users[sub].push(id)
+				} else if (users[sub].includes(id)) {
+					console.log('Этот пользователь уже добавлен в массив');
+				} else {
+					console.log('Добавляем пользователя в массив')
+					users[sub].push(id)
+				}
+			})
+			return db;
+		} else if (newUser.status == 'kicked') {
+			await ctx.reply(`Пользователь ${newUser.username} заблокирован за нарушение правил канала, попробуйте выбрать другого человка`, {
+				reply_markup: {
+					keyboard: createChooseUserBtn(ctx),
+					resize_keyboard: true,
+					one_time_keyboard: true
+				}
+			})
+		} else await ctx.reply(`Пользователь ${newUser.username} уже подписан на канал, попробуйте выбрать другого человка`, {
+				reply_markup: {
+					keyboard: createChooseUserBtn(ctx),
+					resize_keyboard: true,
+					one_time_keyboard: true
+				}
 			})
 	} catch (error) {
 		console.log('Сработал Catch');
@@ -185,17 +245,19 @@ bot.on(':users_shared', async (ctx) => {
 			}
 		})
 		db.read()
-		// console.log(db.data);
-		console.log(!db.data.users.find((user) => user["newUser"] == id));
-		if ((!db.data.users.length) || (!db.data.users.find((user) => user.newUser == id))) {
-			console.log('Запись');
-			const data = {
-				"sub": ctx.message.from.id,
-				"newUser": id
+		db.update(({ users }) => {
+			if (!Object.hasOwn(users, sub)) {
+				console.log('Создаем пустой массив для подписчика и добавляем пользоваателя в массив');
+				users[sub] = [];
+				users[sub].push(id)
+			} else if (users[sub].includes(id)) {
+				console.log('Этот пользователь уже добавлен в массив');
+			} else {
+				console.log('Добавляем пользователя в массив')
+				users[sub].push(id)
 			}
-			db.update(({ users }) => users.push(data))
-			return db;
-		}
+		})
+		return db;
 	}
 	})
 	

@@ -11,4 +11,11 @@ export const createChooseUserBtn = (ctx) => {
 		}]])
 }
 
+export const isDbEmpty = (db) => {
+	return !Boolean(db.data.users.length())
+}
+
+export const doesDbHaveSub = (db, sub) => {
+	return db.data.users
+}
 

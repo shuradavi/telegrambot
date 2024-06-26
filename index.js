@@ -1,10 +1,10 @@
 import 'dotenv/config'
 import { LowSync, Low } from 'lowdb'
 import { JSONFileSync, JSONFilePreset } from 'lowdb/node'
-import { Bot, GrammyError,HttpError, Keyboard } from "grammy";
+import { Bot, GrammyError, HttpError, Keyboard } from "grammy";
+import { chooseWiner } from './utils.js';
 const bot = new Bot(process.env.BOT_TOKEN);
 const db = new LowSync(new JSONFileSync('users.json'), { "users": {} })
-// const cl = new LowSync(new JSONFileSync('contestList.json'), { "list": {} })
 const cl = await JSONFilePreset(('contestList.json'), { "users": {}})
 const createChooseUserBtn = (ctx) => {
 	return (
@@ -81,6 +81,16 @@ bot.command('menu', (ctx) => {
 })
 })
 
+bot.command('choose_winner', async (ctx) => {
+	if (ctx.message.from.id === 951161100) {
+		cl.read()
+		const winnerId = chooseWiner(cl.data.contestList)
+		const pass = await bot.api.getChatMember('@shuratest', winnerId)
+		const winner = pass.user;
+		ctx.reply(`В розыгрыше победил ${winner.first_name} @${winner.username}`)
+	}
+})
+
 bot.command('tickets', async (ctx) => {
 	const userId = ctx.message.from.id;
 	db.read()
@@ -109,22 +119,23 @@ bot.command('getContestList', async (ctx) => {
 	if (ctx.message.from.id == 951161100) {
 		db.read()
 		const usersList = Object.keys(db.data.users)
-		let contestList = {}
+		let contestList = []
 		for (let i = 0; i < usersList.length; i++) {
-			const invitedUsers = db.data.users[usersList[i]]
-			const invitedUsersCount = invitedUsers.length
-			contestList = {
-				...contestList,
-				[usersList[i]]: invitedUsersCount
+			const userId = usersList[i]
+			console.log(userId);
+			const countIncomingSubs = db.data.users[usersList[i]].length
+			for (let i = 0; i < countIncomingSubs; i++) {
+				contestList.push(userId)
 			}
 		}
+		console.log(contestList);
 		await cl.read()
-		await cl.update(({}) => {
-			console.log('Запись...');
-			cl.data = {...contestList}
+		await cl.update(({ }) => {
+			console.log('Запись в contestList');
+			cl.data = {contestList}
 		})
-		return cl;
 	}
+	return cl;
 })
 
 bot.hears('Проверить билеты', async (ctx) => {

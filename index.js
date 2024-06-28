@@ -2,10 +2,10 @@ import 'dotenv/config'
 import { LowSync, Low } from 'lowdb'
 import { JSONFileSync, JSONFilePreset } from 'lowdb/node'
 import { Bot, GrammyError, HttpError, Keyboard } from "grammy";
-import { chooseWiner } from './utils.js';
+import { chooseWiner, isSub } from './utils.js';
 const bot = new Bot(process.env.BOT_TOKEN);
 const db = new LowSync(new JSONFileSync('users.json'), { "users": {} })
-const cl = await JSONFilePreset(('contestList.json'), { "users": {}})
+const cl = await JSONFilePreset(('contestList.json'), { "list": {}})
 const createChooseUserBtn = (ctx) => {
 	return (
 		[
@@ -41,10 +41,10 @@ bot.api.setMyCommands([
 		command: 'menu',
 		description: 'Открыть меню'
 	},
-	{
-		command: 'tickets',
-		description: 'Билеты розыгрыша'
-	}
+	// {
+	// 	command: 'tickets',
+	// 	description: 'Билеты розыгрыша'
+	// }
 ]);
 
 // Создаем клавиатуру для меню
@@ -81,6 +81,12 @@ bot.command('menu', (ctx) => {
 })
 })
 
+bot.command('help', async (ctx) => {
+	if (ctx.message.from.id === 951161100) {
+		ctx.reply('Перед розыгрышем необходимо обновить список, отправив боту команду /getContestList, в ответ бот ответит, что запись произведена. Для проведения розыгрыша используйте команду /choose_winner. В ответном сообщении бот вернет победителя!')
+	}
+})
+
 bot.command('choose_winner', async (ctx) => {
 	if (ctx.message.from.id === 951161100) {
 		cl.read()
@@ -91,29 +97,31 @@ bot.command('choose_winner', async (ctx) => {
 	}
 })
 
-bot.command('tickets', async (ctx) => {
-	const userId = ctx.message.from.id;
-	db.read()
-	const invitedUsers = db.data.users[userId];
-	let tickets;
-	tickets = await invitedUsers.reduce( async  (acc, cur) => {
-		try {
-			let pass = await bot.api.getChatMember('@shuratest', cur);
-			if (pass.status == 'member') {
-				console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
-				acc = await acc + 1;
-			} else {
-				console.log(`Пользователь с id: ${cur} не подписан на канал`);
-			}
-		} catch (error) {
-			console.log(`Пользователь с id: ${cur} не подписан на канал`);
-		}
-		return acc;
-	}, 0)
-	await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
-		reply_markup: menuKeyboard
-	})
-})
+// bot.command('tickets', async (ctx) => {
+// 	const userId = ctx.message.from.id;
+// 	db.read()
+// 	const invitedUsers = db.data.users[userId];
+// 	console.log(userId);
+// 	console.log(invitedUsers);
+// 	let tickets;
+// 	// tickets = await invitedUsers.reduce( async  (acc, cur) => {
+// 	// 	try {
+// 	// 		let pass = await bot.api.getChatMember('@shuratest', cur);
+// 	// 		if (pass.status == 'member') {
+// 	// 			console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
+// 	// 			acc = await acc + 1;
+// 	// 		} else {
+// 	// 			console.log(`Пользователь с id: ${cur} не подписан на канал`);
+// 	// 		}
+// 	// 	} catch (error) {
+// 	// 		console.log(`Пользователь с id: ${cur} не подписан на канал`);
+// 	// 	}
+// 	// 	return acc;
+// 	// }, 0)
+// 	// await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
+// 	// 	reply_markup: menuKeyboard
+// 	// })
+// })
 
 bot.command('getContestList', async (ctx) => {
 	if (ctx.message.from.id == 951161100) {
@@ -122,44 +130,64 @@ bot.command('getContestList', async (ctx) => {
 		let contestList = []
 		for (let i = 0; i < usersList.length; i++) {
 			const userId = usersList[i]
-			console.log(userId);
-			const countIncomingSubs = db.data.users[usersList[i]].length
-			for (let i = 0; i < countIncomingSubs; i++) {
-				contestList.push(userId)
+			console.log('id инвайтера', userId);
+			// const countIncomingSubs = db.data.users[userId].length
+			const arrayOfInvitedUsers = db.data.users[userId]
+			for (let i = 0; i < arrayOfInvitedUsers.length; i++) {
+
+				try {
+					const pass = await bot.api.getChatMember('@shuratest', arrayOfInvitedUsers[i]);
+					if (pass.status == 'member') {
+						contestList.push(userId)
+					}
+				} catch (error) {
+					console.log('Пользователь не подписался');
+				}
+				
 			}
 		}
 		console.log(contestList);
-		await cl.read()
-		await cl.update(({ }) => {
+		const today = new Date();
+		const dd = String(today.getDate()).padStart(2, '0');
+		const mm = String(today.getMonth() + 1).padStart(2, '0');
+		const yyyy = today.getFullYear();
+		const hour = String(today.getHours())
+		const min = String(today.getMinutes())
+		cl.read()
+		cl.update(({ }) => {
 			console.log('Запись в contestList');
 			cl.data = {contestList}
 		})
+		await ctx.reply(`Запись произведена, список актуализирован на момент ${dd}.${mm}.${yyyy} ${hour}:${min}`)
+		return cl;
 	}
-	return cl;
+	
+	
 })
 
 bot.hears('Проверить билеты', async (ctx) => {
-	const userId = ctx.message.from.id;
-	db.read()
-	const invitedUsers = db.data.users[userId];
-	let tickets = 0;
-	tickets = await invitedUsers.reduce( async  (acc, cur) => {
-		try {
-			let pass = await bot.api.getChatMember('@shuratest', cur);
-			if (pass.status == 'member') {
-				console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
-				acc = await acc + 1;
-			} else {
-				console.log(`Пользователь с id: ${cur} не подписан на канал`);
-			}
-		} catch (error) {
-			console.log(`Пользователь с id: ${cur} не подписан на канал`);
-		}
-		return acc;
-	}, 0)
-	await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
-		reply_markup: menuKeyboard
-	})
+	// const userId = ctx.message.from.id;
+	// db.read()
+	// const invitedUsers = db.data.users[userId];
+	// let tickets = 0;
+	// tickets = await invitedUsers.reduce( async  (acc, cur) => {
+	// 	try {
+	// 		let pass = await bot.api.getChatMember('@shuratest', cur);
+	// 		if (pass.status == 'member') {
+	// 			console.log(`Пользователь с id: ${cur} подписался на канал, добавляем билетик!`);
+	// 			acc = await acc + 1;
+	// 		} else {
+	// 			console.log(`Пользователь с id: ${cur} не подписан на канал`);
+	// 		}
+	// 	} catch (error) {
+	// 		console.log(`Пользователь с id: ${cur} не подписан на канал`);
+	// 	}
+	// 	return acc;
+	// }, 0)
+	// await ctx.reply(`Из ${invitedUsers.length} приглашенных Вами друзей подписались ${tickets} ! Итого у вас:  ${tickets} билет(а/ов)`, {
+	// 	reply_markup: menuKeyboard
+	// })
+	await ctx.reply('Проверка билетов временно отключена')
 })
 
 bot.hears('Проверить подписку на канал', async (ctx) => {
@@ -216,13 +244,14 @@ bot.on(':users_shared', async (ctx) => {
 				}
 			})
 			db.read()
-			db.update(({ users }) => {
+			db.update(({users}) => {
 				if (!Object.hasOwn(users, sub)) {
-					console.log('Создаем пустой массив для подписчика и добавляем пользоваателя в массив');
+					console.log('Добавляем нового пользователя в базу из Catch');
+					console.log('sub: ', sub, 'id: ', id, );
 					users[sub] = [];
 					users[sub].push(id)
 				} else if (users[sub].includes(id)) {
-					console.log('Этот пользователь уже добавлен в массив');
+				console.log('Данный пользователь уже приглашал этого друга');
 				} else {
 					console.log('Добавляем пользователя в массив')
 					users[sub].push(id)
@@ -256,13 +285,14 @@ bot.on(':users_shared', async (ctx) => {
 			}
 		})
 		db.read()
-		db.update(({ users }) => {
+		db.update(({users}) => {
 			if (!Object.hasOwn(users, sub)) {
-				console.log('Создаем пустой массив для подписчика и добавляем пользоваателя в массив');
+				console.log('Добавляем нового пользователя в базу из Catch');
+				console.log('sub: ', sub, 'id: ', id, );
 				users[sub] = [];
 				users[sub].push(id)
 			} else if (users[sub].includes(id)) {
-				console.log('Этот пользователь уже добавлен в массив');
+				console.log('Данный пользователь уже приглашал этого друга');
 			} else {
 				console.log('Добавляем пользователя в массив')
 				users[sub].push(id)

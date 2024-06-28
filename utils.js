@@ -19,6 +19,13 @@ export const doesDbHaveSub = (db, sub) => {
 	return db.data.users
 }
 
+export const isSub = async (str, user_id) => {
+	const pass = await bot.api.getChatMember(str, user_id);
+	if (pass.status == 'member') {
+		return true
+	} else return false
+}
+
 export const chooseWiner = (list) => {
 	const max = list.length
 	const winnerIdx = Math.floor(Math.random() * max)

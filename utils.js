@@ -20,8 +20,10 @@ export const doesDbHaveSub = (db, sub) => {
 }
 
 export const chooseWiner = (list) => {
-	const max = list.length
-	const winnerIdx = Math.floor(Math.random() * max)
-	const winnerId = list[winnerIdx]
-	return winnerId
+	if (Boolean(list.length)) {
+		const max = list.length
+		const winnerIdx = Math.floor(Math.random() * max)
+		const winnerId = list[winnerIdx]
+		return winnerId
+	}
 }

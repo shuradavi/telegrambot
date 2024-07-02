@@ -148,12 +148,52 @@ bot.command('help', async (ctx) => {
 bot.command('start', async (ctx) => {
 	if (ctx.from.is_bot === false) {
 		const username = ctx.msg.from.username
-		await ctx.reply(`Привет, ${username}! Я - бот тг-канала: <a href="https://t.me/testchannel_178">Тестовый канал</a>`, {
+		await ctx.reply(`Привет, ${username}!
+Я - бот тг-канала: <a href="https://t.me/testchannel_178">Тестовый канал</a>`, {
 			parse_mode: 'HTML',
-			reply_markup: menuKeyboard,
+			reply_markup: new InlineKeyboard().text('Участвовать в розыгрыше', 'participate'),
 		})
 	}
 })
+
+// Принять участие в розыгрыше
+bot.callbackQuery('participate', async (ctx) => {
+	await ctx.editMessageText(`Задачи 👇
+Подписаться на канал 🟥
+Пригласить друга 🟥`)
+	await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Проверить подписку на канал', 'check_sub')})
+})
+
+// Проверка подписки на канал
+bot.callbackQuery('check_sub', async (ctx) => {
+	const id = ctx.update.callback_query.from.id
+	try {
+		let pass = await bot.api.getChatMember('@testchannel_178', id)
+		if (pass.status == 'left') {
+			await ctx.editMessageText(`Вы не подписаны на канал ❌
+Перейдите по ссылке и подпишитесь на канал 👇`)
+			await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Перейти и подписаться на канал', 'go_and_sub').text('Проверить подписку на канал', 'check_sub')})
+		} else {
+			await ctx.editMessageText(`Задачи 👇
+Подписаться на канал ✅
+Пригласить друга 🟥`)
+			await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('Пригласить друга', 'invite_friend') })
+			await ctx.answerCallbackQuery('Проверка успешно пройдена 👍🏻')
+		}
+	} catch (error) {
+		console.log('error');
+	}
+})
+
+// Переход на канал для подписки
+bot.callbackQuery('go_and_sub', async (ctx) => {
+
+})
+
+bot.callbackQuery('invite_friend', async (ctx) => {
+
+})
+
 
 bot.command('menu', (ctx) => {
 	ctx.reply(`Выберите действие`, {
@@ -251,7 +291,7 @@ bot.hears('Проверить подписку на канал', async (ctx) => 
 		)
 	}
 })
-
+bot.callbackQuery()
 bot.hears('Пригласить друга', async (ctx) => {
 	await ctx.reply('Выберите друга из списка контактов', {
 		reply_markup: {
@@ -261,6 +301,8 @@ bot.hears('Пригласить друга', async (ctx) => {
 		}
 	})
 })
+
+
 
 bot.on(':users_shared', async (ctx) => {
 	let sub = ctx.message.from.id

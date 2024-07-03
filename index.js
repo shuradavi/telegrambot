@@ -84,21 +84,21 @@ const inlineKeyboardHelper2 = InlineKeyboard.from([helpButtonRow2])
 bot.command('start', async (ctx) => {
 	if (ctx.from.is_bot === false) {
 		const username = ctx.msg.from.username
-		ctx.dele
 		await ctx.reply(`Привет, ${username}!
 Я - бот тг-канала: <a href="https://t.me/testchannel_178">Тестовый канал</a>`, {
 			parse_mode: 'HTML',
 			reply_markup: new InlineKeyboard().text('Участвовать в розыгрыше', 'participate'),
 		})
+		await ctx.deleteMessage()
 	}
 })
 
 // Сценарий 1 Этап 1
 // Принять участие в розыгрыше
 bot.callbackQuery('participate', async (ctx) => {
-	await ctx.editMessageText(`Задачи 👇
-Подписаться на канал 🟥
-Пригласить друга 🟥`)
+	await ctx.editMessageText(`Для участия в розыгрыше:
+Подпишись на канал 🟥
+Пригласи друга 🟥`)
 	await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Проверить подписку на канал', 'check_sub')})
 })
 
@@ -113,10 +113,10 @@ bot.callbackQuery('check_sub', async (ctx) => {
 Перейдите по ссылке и подпишитесь на канал 👇`)
 			await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Перейти и подписаться на канал', 'go_and_sub').text('Проверить подписку на канал', 'check_sub')})
 		} else {
-			await ctx.editMessageText(`Задачи 👇
-Подписаться на канал ✅
-Пригласить друга 🟥`)
-			await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('Пригласить друга', 'invite_friend') })
+			await ctx.editMessageText(`Для участия в розыгрыше необходимо:
+Подпишись на канал ✅
+Пригласи друга 🟥`)
+			await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('Пригласить друга', 'invite_friend')})
 			await ctx.answerCallbackQuery('Проверка успешно пройдена 👍🏻')
 		}
 	} catch (error) {
@@ -133,7 +133,11 @@ bot.callbackQuery('go_and_sub', async (ctx) => {
 // Сценарий 1 Этап 3б
 // Пригласить друга
 bot.callbackQuery('invite_friend', async (ctx) => {
-
+	({request_users: {
+		request_id: ctx.message.from.id,
+		request_username: true,
+		user_is_bot: false
+	}})
 })
 
 // Сценарий 1 Этап 4

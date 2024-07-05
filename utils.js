@@ -27,3 +27,4 @@ export const chooseWiner = (list) => {
 		return winnerId
 	}
 }
+

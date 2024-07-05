@@ -1,10 +1,15 @@
 import 'dotenv/config'
+import TelegramBot from 'node-telegram-bot-api';
 import {JSONFilePreset } from 'lowdb/node'
 import { Bot, GrammyError, HttpError, InlineKeyboard, Keyboard } from "grammy";
 import { chooseWiner } from './utils.js';
 const bot = new Bot(process.env.BOT_TOKEN)
 const db = await JSONFilePreset(('users.json'), { "users": {} })
-const cl = await JSONFilePreset(('contestList.json'), { "list": {}})
+const cl = await JSONFilePreset(('contestList.json'), { "list": {} })
+// функция имитация спинера во время обработки загрузки
+const timeoutSpinner = async (ctx) => {
+	await ctx.editMessageText('Выполняется обработка запроса...')
+}
 const createChooseUserBtn = (ctx) => {
 	return (
 		[
@@ -45,7 +50,7 @@ bot.api.setMyCommands([
 	{
 		command: 'tickets',
 		description: 'Билеты розыгрыша'
-	}
+	},
 ]);
 
 // Создаем клавиатуру для меню
@@ -61,6 +66,7 @@ const onFailSubRows = onFailSub.map((label) => {
 		Keyboard.text(label)
 	]
 })
+
 const menuKeyboard = Keyboard.from(menuRows).resized().oneTime()
 const shareUserKeyboard = new Keyboard().text('Пригласить друга').row().text('Проверить билеты').row().text('<- Назад в меню').resized()
 const onFailSubKeyboard = Keyboard.from(onFailSubRows).resized().oneTime()
@@ -76,6 +82,7 @@ const labelHelpData2 = [
 ];
 const helpButtonRow = labelHelpData.map(([label, data]) => InlineKeyboard.text(label, data));
 const helpButtonRow2 = labelHelpData2.map(([label, data]) => InlineKeyboard.text(label, data));
+
 
 const inlineKeyboardHelper = InlineKeyboard.from([helpButtonRow])
 const inlineKeyboardHelper2 = InlineKeyboard.from([helpButtonRow2])
@@ -99,25 +106,56 @@ bot.callbackQuery('participate', async (ctx) => {
 	await ctx.editMessageText(`Для участия в розыгрыше:
 Подпишись на канал 🟥
 Пригласи друга 🟥`)
-	await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Проверить подписку на канал', 'check_sub')})
+	await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('Проверить подписку на канал', 'check_sub') })
+	await ctx.answerCallbackQuery()
 })
 
 // Сценарий 1 Этап 2
 // Проверка подписки на канал
 bot.callbackQuery('check_sub', async (ctx) => {
 	const id = ctx.update.callback_query.from.id
+	const chatId = ctx.update.callback_query.message.chat.id;
+
+	console.log(ctx);
 	try {
+		timeoutSpinner(ctx)
 		let pass = await bot.api.getChatMember('@testchannel_178', id)
 		if (pass.status == 'left') {
-			await ctx.editMessageText(`Вы не подписаны на канал ❌
-Перейдите по ссылке и подпишитесь на канал 👇`)
-			await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Перейти и подписаться на канал', 'go_and_sub').text('Проверить подписку на канал', 'check_sub')})
+			setTimeout(async() => {
+				await ctx.editMessageText(`Вы не подписаны на канал ❌
+					Перейдите по ссылке и подпишитесь на канал 👇`)
+				await ctx.editMessageReplyMarkup({reply_markup: new InlineKeyboard().text('Перейти и подписаться на канал', 'go_and_sub').text('Проверить подписку на канал', 'check_sub')})
+			}, 1500)
+			
 		} else {
-			await ctx.editMessageText(`Для участия в розыгрыше необходимо:
-Подпишись на канал ✅
-Пригласи друга 🟥`)
-			await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text('Пригласить друга', 'invite_friend')})
-			await ctx.answerCallbackQuery('Проверка успешно пройдена 👍🏻')
+			setTimeout(async() => {
+				await ctx.editMessageText(`Для участия в розыгрыше необходимо:
+					Подпишись на канал ✅
+					Пригласи друга 🟥`)
+				await bot.api.sendMessage(chatId, 'button_text', {
+					reply_markup: JSON.stringify({
+						inline_keyboard: [
+							[{text: 'text', callback_data: '123'}]
+						]
+					}),
+					request_users: {
+						request_id: ctx.update.callback_query.from.id,
+						request_username: true,
+						user_is_bot: false
+				}})
+				// await ctx.editMessageReplyMarkup({
+				// 	reply_markup: JSON.stringify({
+				// 		inline_keyboard: [
+				// 			[{ text: 'button text', callback_data: JSON.stringify({request_users: {
+				// 				request_id: ctx.update.callback_query.from.id,
+				// 				request_username: true,
+				// 				user_is_bot: false
+				// 			}})}]
+				// 		]
+				// 	})
+				// })
+				await ctx.answerCallbackQuery('Проверка успешно пройдена 👍🏻')
+			}, 1500);
 		}
 	} catch (error) {
 		console.log('error');
@@ -132,19 +170,34 @@ bot.callbackQuery('go_and_sub', async (ctx) => {
 
 // Сценарий 1 Этап 3б
 // Пригласить друга
+const requestUserParams = {
+	user_is_bot: false, 
+	request_username: true,
+}
+
+const requestUserBtn = {
+
+	request_users: {
+		user_is_bot: false,
+		request_username: true
+	}
+}
+
 bot.callbackQuery('invite_friend', async (ctx) => {
-	({request_users: {
-		request_id: ctx.message.from.id,
-		request_username: true,
-		user_is_bot: false
-	}})
+	
 })
+	// await ctx.editMessageReplyMarkup({
+	// 	reply_markup: {
+	// 		inline_keyboard:
+	// 			}
+	// })})
 
 // Сценарий 1 Этап 4
 // Обработка приглашенного пользователя новая версия
 
 // Обработка приглашенного пользователя старая версия
 bot.on(':users_shared', async (ctx) => {
+	console.log(ctx);
 	let sub = ctx.message.from.id
 	let newUser = ctx.message.users_shared.users[0];
 	let id = newUser.user_id;
@@ -259,6 +312,7 @@ bot.command('tickets', async (ctx) => {
 		}
 	})
 })
+
 
 // Спецкоманды для админа
 bot.callbackQuery('getContestAndChooseWinner', async (ctx) => {

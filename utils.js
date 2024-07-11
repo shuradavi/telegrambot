@@ -15,7 +15,7 @@ export const isDbEmpty = (db) => {
 	return !Boolean(db.data.users.length())
 }
 
-export const doesDbHaveSub = (db, sub) => {
+export const doesDbHaveSub = (db, sponsorId) => {
 	return db.data.users
 }
 

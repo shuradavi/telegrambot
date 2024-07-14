@@ -5,6 +5,12 @@ import { chooseWiner } from './utils.js';
 const bot = new Bot(process.env.BOT_TOKEN)
 const db = await JSONFilePreset(('users.json'), { "users": {} })
 const cl = await JSONFilePreset(('contestList.json'), { "list": {} })
+const channelLink = 'https://t.me/larichevafood';
+const channelMask = '@larichevafood';
+const channelName = 'Oh Laricheva'
+// const channelLink = 'https://t.me/testchannel_178'
+// const channelMask = '@testchannel_178'
+// const channelName = 'Testoviy'
 
 // Слушатель для админа: актуализировать список участников
 bot.hears('Обновить список', async (ctx) => {
@@ -18,7 +24,7 @@ bot.hears('Обновить список', async (ctx) => {
 			const arrayOfInvitedUsers = db.data.users[userId]
 			for (let i = 0; i < arrayOfInvitedUsers.length; i++) {
 				try {
-					const pass = await bot.api.getChatMember('@testchannel_178', arrayOfInvitedUsers[i]);
+					const pass = await bot.api.getChatMember(channelMask, arrayOfInvitedUsers[i]);
 					if (pass.status == 'member') {
 						contestList.push(userId)
 						console.log(`Пользователь ${arrayOfInvitedUsers[i]} подписался, +1 билет для ${userId}`);
@@ -49,10 +55,15 @@ bot.hears('Обновить список', async (ctx) => {
 bot.hears('Определить победителя', async (ctx) => {
 	if (ctx.message.from.id == 951161100 || ctx.message.from.id == 1070235538) {
 		await cl.read()
-		const winnerId = chooseWiner(cl.data.contestList)
-		const pass = await bot.api.getChatMember('@testchannel_178', winnerId)
-		const winner = pass.user;
-		ctx.reply(`В розыгрыше победил ${winner.first_name} @${winner.username}`)
+		if (Boolean(cl.data.contestList.length)) {
+			const winnerId = chooseWiner(cl.data.contestList)
+			const pass = await bot.api.getChatMember(channelName, winnerId)
+			const winner = pass.user;
+			ctx.reply(`В розыгрыше победил ${winner.first_name} @${winner.username}`)
+		} else {
+			ctx.reply('Список розыгрыша пуст')
+		}
+		
 	}
 })
 
@@ -89,7 +100,7 @@ const lotteryKeyboard = new Keyboard()
 bot.command('start', async (ctx) => {
 	if (ctx.from.is_bot === false) {
 		const username = ctx.msg.from.username
-		await ctx.reply(`Привет, ${username}! \nЯ - бот тг-канала: <a href="https://t.me/testchannel_178">Тестовый канал</a> \nВыберите действие, чтобы продолжить 👇`, {
+		await ctx.reply(`Привет, ${username}! \nЯ - бот тг-канала: <a href='${channelLink}'>${channelName}</a> \nВыберите действие, чтобы продолжить 👇`, {
 			parse_mode: 'HTML',
 			reply_markup: menuKeyboard
 		})
@@ -115,7 +126,7 @@ bot.hears('Информация о розыгрыше 🎲', async (ctx) => {
 
 bot.hears('Ссылка на канал 🔗', async (ctx) => {
 	await ctx.deleteMessage()
-	await ctx.reply('<a href="https://t.me/testchannel_178">Нажмите для перехода 👈</a>', {
+	await ctx.reply(`<a href="${channelLink}">Нажмите для перехода 👈</a>`, {
 		parse_mode: 'HTML',
 		reply_markup: new Keyboard().text('В главное меню 🔙').resized()
 	})
@@ -125,9 +136,9 @@ bot.hears('Пригласить друга 👥', async (ctx) => {
 	await ctx.deleteMessage()
 	const userId = ctx.update.message.from.id
 	try {
-		let pass = await bot.api.getChatMember('@testchannel_178', userId)
+		let pass = await bot.api.getChatMember(channelMask, userId)
 		if (pass.status == 'left') {
-			await ctx.reply('Для участия в розыгрыше вы должны быть подписаны на канал, перейдите по ссылке и подпишитесь: <a href="https://t.me/testchannel_178">канал</a>', {
+			await ctx.reply(`Для участия в розыгрыше вы должны быть подписаны на канал, перейдите по ссылке и подпишитесь: <a href="${channelLink}">${channelName}/a>`, {
 				parse_mode: 'HTML'
 			})
 		} else if (pass.status == 'kicked') {
@@ -180,7 +191,7 @@ bot.hears('Билеты 🎟️', async (ctx) => {
 		let tickets = 0
 		for (let i=0; i < invitedUsers.length; i++) {
 			try {
-				let pass = await bot.api.getChatMember('@testchannel_178', invitedUsers[i])
+				let pass = await bot.api.getChatMember(channelMask, invitedUsers[i])
 				if (pass.status == 'member') {
 					tickets += 1
 				}
@@ -209,7 +220,7 @@ bot.on(':users_shared', async (ctx) => {
 	const newUserId = ctx.message.user_shared.user_id
 	const sponsorId = ctx.message.user_shared.request_id
 	try {
-		const pass = await bot.api.getChatMember('@testchannel_178', newUserId);
+		const pass = await bot.api.getChatMember(channelMask, newUserId);
 		if (pass.status == 'kicked') {
 			await ctx.reply('⛔ Пользователь заблокирован за нарушение правил канала, попробуйте выбрать другого человка')
 		} else if (pass.status != 'left') {
@@ -222,7 +233,7 @@ bot.on(':users_shared', async (ctx) => {
 					users[sponsorId] = [];
 					users[sponsorId].push(newUserId)
 				})
-				await ctx.reply('🔗 Отправьте ссылку на канал другу и попросите подписаться: https://t.me/testchannel_178')
+				await ctx.reply(`🔗 Отправьте ссылку на канал другу и попросите подписаться: ${channelLink}`)
 				await ctx.reply('⏱ Как только ваш друг подпишется на канал, вам добавится билет розыгрыша ')
 			} else if (db.data.users[sponsorId].includes(newUserId)) {
 				console.log('Данный спонсор уже приглашал этого пользователя');
@@ -230,7 +241,7 @@ bot.on(':users_shared', async (ctx) => {
 			} else {
 				await db.update(({ users }) => users[sponsorId].push(newUserId))
 				console.log('Добавляем нового пользователя в лист приглашений от спонсора')
-				await ctx.reply('🔗 Отправьте ссылку на канал другу и попросите подписаться: https://t.me/testchannel_178')
+				await ctx.reply(`🔗 Отправьте ссылку на канал другу и попросите подписаться: ${channelLink}`)
 				await ctx.reply('⏱ Как только ваш друг подпишется на канал, вам добавится билет розыгрыша ')
 			}
 		}
@@ -243,7 +254,7 @@ bot.on(':users_shared', async (ctx) => {
 				users[sponsorId] = [];
 				users[sponsorId].push(newUserId)
 			})
-			await ctx.reply('🔗 Отправьте ссылку на канал другу и попросите подписаться: https://t.me/testchannel_178')
+			await ctx.reply(`🔗 Отправьте ссылку на канал другу и попросите подписаться: ${channelLink}`)
 			await ctx.reply('⏱ Как только ваш друг подпишется на канал, вам добавится билет розыгрыша ')
 		} else if (db.data.users[sponsorId].includes(newUserId)) {
 			console.log('CATCH Данный спонсор уже приглашал этого пользователя');
@@ -251,7 +262,7 @@ bot.on(':users_shared', async (ctx) => {
 		} else {
 			await db.update(({ users }) => users[sponsorId].push(newUserId))
 			console.log('CATCH Добавляем нового пользователя в лист приглашений от спонсора')
-			await ctx.reply('🔗 Отправьте ссылку на канал другу и попроосите подписаться: https://t.me/testchannel_178')
+			await ctx.reply(`🔗 Отправьте ссылку на канал другу и попросите подписаться: ${channelLink}`)
 			await ctx.reply('⏱ Как только ваш друг подпишется на канал, вам добавится билет розыгрыша ')
 		}
 	}
